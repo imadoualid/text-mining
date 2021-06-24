@@ -1,0 +1,341 @@
+---
+title: "Partie A:"
+output: html_notebook
+---
+
+Binome : - Wacim BELAHCEL
+         - Imad Oualid KACIMI 
+
+#Partie A :
+
+
+
+## Lecture du dataset et import
+```{r}
+
+library(FactoMineR)
+library(stats)
+spam=read.table("https://www.math.univ-toulouse.fr/~besse/Wikistat/data/spam.dat",header=TRUE)
+dim(spam)
+names(spam)
+spam[,1]=as.factor(spam[,1])
+spam
+
+```
+
+les données sont trés asysemtrique avec des valeurs max tres eloigné du centre (skewed), 
+la normalisation log rapproche les données leurs donne une forme un peu plus normal
+```{r}
+Lspam=data.frame("spam"=spam[,1],log(1+spam[,2:58]))
+Lspam
+summary(spam)
+
+```
+```{r}
+library(Factoshiny)
+Factoshiny(Lspam)
+```
+
+
+```{r}
+res.PCA<-PCA(Lspam,quali.sup=c(1),graph=FALSE)
+plot.PCA(res.PCA,choix='var',select='contrib  57',unselect=0,title="Graphe des variables de l'ACP",col.quanti.sup='#0000FF')
+plot.PCA(res.PCA,invisible=c('ind.sup'),select='contrib  402',habillage=1,title="Graphe des individus de l'ACP",label ='none')
+```
+
+
+
+
+## Données non scalées sans log : 
+les données ne sont pas trés bien représenté, une minorité
+d'indidividu participe fortement à la création des axes, le reste sont rassemblé autour de
+l'origine. (1754, 1489, 904...)
+les variable Caplsup et Capltot et Caplm participe fortement à la creation
+des axes (l'axe 1 => Capltot et l'axe 2 => CaplSup Caplm)
+```{r}
+
+res.pca=PCA(spam,scale.unit = FALSE,quali.sup=1)
+
+
+```
+
+## Données scalées sans log : 
+pas de gros changement dans la contribution des individu (il y'a toujours des individu qui contribue trop fortement
+à la creation des axex) cependant cela donne une meilleurs visualisation et cela met toutes les variable
+sur un meme scale ce qui atténue la contribution des variable CAP il y'a donc plus de variable qui conribue à la creationdes axes.
+
+```{r}
+
+res.pca1=PCA(spam,scale.unit = TRUE,quali.sup=1)
+
+```
+
+## Données non scalées avec log : 
+
+la log transform atténue la contribution des individus cité precedement, cependant nous perdons le scaling de nos variable
+cité predecement et avons donc le méme probléme que dans la premiére représentation, c'est à dire que certaines variable (CAPS)
+contribue trop fortement à la création des axes.
+```{r}
+res.pca=PCA(Lspam,scale.unit = FALSE, quali.sup=1)
+
+```
+
+
+## Données scalées avec log : 
+on retrouve l'avantage qu'offre le scaling sur nos variable qui attenue la contribution des variable caps sur nos axes
+(bien que dans ce cas nous voyons une forte contribution sur l'axe 2), les individu paraisse un peu mieux séparé que sur le premier cas, avec une contribution attenué de nos outlier (on remarque particulierement
+que l'individu 1754 n'est pas celui qui contribue le plus à la creation de nos axes)
+nous remarqu'on quand méme une contribution plus forte de certains.
+```{r}
+res.pca=PCA(Lspam,scale.unit = TRUE,quali.sup=1)
+
+```
+
+
+##
+en utilisant la command si dessous, on peut voir qu'il y'a une forte correlation avec certains mots
+technique sur l'aXe 1 (X857, X415, telnet, labs X85...), on peut donc en déduire que l'axe 1 décrit 
+la nature d'un email
+l'axe 2 quand a lui est est trés corrélé avec les variable CAPLsup, CapLtot, CapLM, nous pouvons donc en déduire
+que cette axe décrit la syntax utilisé dans l'écriture de l'email
+
+```{r}
+barplot(res.pca$eig[,1],main="Eigenvalues",
+        names.arg=1:nrow(res.pca$eig))
+plot(res.pca,choix="ind",habillage=1,
+     lcex=0.5,label ='none')
+plot(res.pca,choix="var")
+
+dimdesc(res.pca,axes=c(1,2))
+
+```
+
+
+# Classification des variables :
+le critére de ward est beaucoup mieux adapté pour des classes qui ne sont pas allongé et bien séparé
+nous remarquons dans ce cas qu'il arrive à séparé nos variable en 2 à 3 catégorie distincts (via la methode du coude)
+nous retrouvons effectivemnt des lements d'interpretation de notre ACP precedente, les variable les plus corrélé à l'axe 1 se retrouve dans un cluster séparé, et celle corrélé à l'axe 2 dans un deuxieme cluster.
+Aussi on peut remarquer que la distance utilisée est basée sur la correlation entre les variables, sachant que pour le nuage de variable obtenue en applicant une pca, sur un tableau reduit centré la distance entre 2 variables est de la meme formule.
+```{r}
+
+dist.var<-as.dist(1-cor(Lspam[2:58])**2)
+clas.var<-hclust(dist.var,method="ward.D2")
+plot(clas.var)
+plot(clas.var$height[56:40])
+
+
+```
+
+
+La rerresentation est trés simmilaire à celle de l'acp car nos variable sont centrées reduites, et la distance utilisée est semblable à la distance obtenue entre 2 variables en appliquant une acp sur un nuage de variable centré réduit 
+```{r}
+
+
+rS = cor(Lspam[2:58])
+dS2=sqrt(1-rS**2)
+dN=dimnames(Lspam[2:58])[[2]]
+mdspam= cmdscale(dS2, k=2)
+plot(mdspam, type="n", xlab="", ylab="",main="")
+text(mdspam,dN)
+abline(v=0,h=0)
+mdspam
+
+
+```
+
+
+
+
+sur le plot des variable de l'acp on peut voir qu'il y'a 4 cluster de variable, par exemple les points bleus sont les plus corrélés avec l'axe 2 et ceux qui contribue le plus à sa création.
+
+```{r}
+classes <- cutree(clas.var,k=4)
+sort(classes)
+names(classes[classes==2]) #variables de la classe 2
+coul = classes
+plot(mdspam, type="n", xlab="Dimension 1",
+     ylab="Dimension 2", main="CAH euclid")
+text(mdspam,dN,col=coul)
+
+```
+# Approche qualitative :
+
+Lecture du fichier
+```{r}
+spam.quali <- read.table("https://www.math.univ-toulouse.fr/~besse/Wikistat/data/spamq.dat")
+spam.quali
+
+
+```
+
+
+## AFCM:
+La discrimination lineaire ne parrait pas etre une approche rentable, bien que l'on voit bien qu'il exite deux cluster disctint il y a un chevauchement important entre les 2 classes.
+```{r}
+afc=MCA(spam.quali,quali.sup=c(32,34,58))
+plot.MCA(afc,invisible=c("ind"),col.var="blue")
+# avec un zoom
+plot.MCA(afc,invisible=c("ind"),col.var="blue",
+xlim=c(-1,1),ylim=c(-1,1))
+
+# les messages en couleur
+plot(afc$ind$coord,type="p",pch=".",cex=2,col=as.factor(spam.quali[,58]),xlim=c(-1,1),ylim=c(-1,1))
+
+
+
+```
+
+
+
+
+
+Les classe semble simmilaire entre le hclust et le kmeans donc on peut dire que les classes sont stables 
+```{r}
+dist.mod=dist(afc$var$coord, method="euclidean")
+hclusmod=hclust(dist.mod,method="ward.D2")
+plot(hclusmod)
+plot(hclusmod$height[112:100])
+hclasmod = cutree(hclusmod,k=4)
+clas.mod=kmeans(afc$var$coord, 4)
+kclasmod=clas.mod$cluster
+# comparaison des classes entre CAH et k-means
+table(hclasmod,kclasmod)
+
+```
+
+les modalitées qui carracterisent la class spam sont ceux les plus proche du centre spam (en bleu)
+les modalitées indifférentiables sont les modalitées qui sont à une distance plus au moin proche des 2 modalitées
+
+```{r}
+plot.MCA(afc,invisible=c("ind"),
+col.var=as.integer(clas.mod$cluster))
+plot(afc$ind$coord,type="p",pch=".",cex=2,
+col=as.factor(spam.quali[,58]))
+
+
+
+
+```
+
+```{r}
+library(NMF)
+
+creux=as.matrix(spam[,1:57])
+creux=data.frame(matrix(as.numeric(as.matrix(spam[,1:57])),ncol=57))
+classe=spam[,58]
+creux=cbind(log(1+creux[,1:54]),log(1+creux[,55:57])/2)
+boxplot(creux)
+# souci pour la suite :
+sum(apply(creux,1,sum)==0)
+# 3 messages sont devenus tout à 0
+# suppression
+ident=apply(creux,1,sum)!=0
+creux=creux[ident,]
+classe=classe[ident]
+```
+
+
+
+
+# application de l'nmf
+
+```{r}
+
+nmf.spam=nmf(creux,5,method="snmf/l",nrun=30,seed=111)
+
+
+
+```
+## Extration des resultats numerics
+```{r}
+summary(nmf.spam)
+s=featureScore(nmf.spam)
+summary(s)
+s=extractFeatures(nmf.spam)
+str(s)
+# les matrices de facteurs
+w=basis(nmf.spam)
+h=coef(nmf.spam)
+```
+
+```{r}
+
+basismap(nmf.spam,annRow=classe,hclustfun="ward")
+coefmap(nmf.spam,hclustfun="ward")
+
+```
+
+
+
+
+
+
+
+```{r}
+dist.mod=dist(t(h), method="euclidean")
+hclusmod.h=hclust(dist.mod,method="ward.D2")
+plot(hclusmod)
+plot(hclusmod$height[56:46])
+```
+
+
+```{r}
+mdspam= cmdscale(dist.mod, k=2)
+dN=dimnames(h)[[2]]
+plot(mdspam, type="n", xlab="", ylab="",main="")
+text(mdspam,dN)
+abline(v=0,h=0)
+```
+
+
+```{r}
+dist.mod=dist(scale(t(h)), method="eucl")
+mdspam= cmdscale(dist.mod, k=2)
+hclusmod.h=hclust(dist.mod,method="ward.D2")
+plot(hclusmod.h)
+plot(hclusmod.h$height[56:46])
+hclasmod = cutree(hclusmod.h,k=4)
+plot(mdspam, type="n", xlab="", ylab="",main="")
+text(mdspam,dN,col=hclasmod)
+abline(v=0,h=0)
+
+
+```
+
+
+```{r}
+#classificaiton des messages à partir de w
+dist.mod=dist(scale(w), method="euclidean")
+hclusmod.w=hclust(dist.mod,method="ward.D2")
+plot(hclusmod.w)
+# intégration des deux classifications
+aheatmap(creux,Rowv=hclusmod.w,
+Colv=hclusmod.h,annRow=classe,
+annCol=as.factor(hclasmod))
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,250 @@
+---
+title: "Partie B sujet 1, visualisation_skmeans_von-Mises-Fischer"
+output: html_notebook
+---
+
+Binome : - Wacim BELAHCEL
+         - Imad Oualid KACIMI  
+
+### Remarque : Dans cette partie nous avons décider de garder 50 mot pour faciliter la visualization.
+
+```{r}
+
+library(FactoMineR)
+library(Factoshiny)
+library(stats)
+library(skmeans)
+library(clusterSim)
+library(aricode)
+library(movMF)
+
+spam=read.csv("C:\\Users\\imadw\\Desktop\\textmining\\spam_cocurence_50.csv")
+spam
+```
+
+
+
+
+
+```{r}
+colnames <- names(spam)
+colnames
+
+
+# extraction de la table des co-occurences
+spamq=data.frame(matrix(as.factor(as.matrix(spam[,1:51]>0)),ncol=51))
+names(spamq) <- colnames
+
+spamq 
+#Factoshiny(spamq)
+
+```
+```{r}
+
+```
+
+#Partie B:
+
+## Q1
+
+
+Test de visualisation avec une afc en utilisant la matrice d'occurence seuelemnt o nremarque que les point sont trés superposé et melangé. nous avons donc fait une 2eme visualisation en appliquant une afcm sur la table de co-occurence.
+
+```{r}
+
+spam_occ <- spam[rowSums(spam[,1:50]) != 0, ]
+res.CA<-CA(spam_occ[rowSums(spam_occ[, 1:50]) != 0, ],col.sup=c(51),graph=FALSE)
+plot(res.CA$row$coord,col=as.factor(spam_occ[,51]), main = "original")
+
+```
+
+
+
+
+en appliquant une afcm sur notre table de co-occurence et en gardant les individus qui cntribuent le plus, on peut remarquer 2 cluster plus au moin lineairement séparable.
+
+en affichant les modalitées, on peut remarquer que le 1 er axe est correlé avec la modalité spam_true, on peeut aussi remarquer que les autres variables qui sont le plus correlés avec ce meme axe sont : free_true phone_true numbr_true, moneysymbole_true... qui ont donc le plus contribués à la création de l'axe et sont des variables qui souvent sont trouvé dans des mails spam, ce qui peux expliquer pourquoi cet axe permet de separer nos deux classes. 
+Pour le 2eme axes on peut remarquer qu'il est plus carracterisé par des mot plutot que des chiffres
+```{r}
+res.MCA<-MCA(spamq,quali.sup=c(12,24,51),graph=FALSE)
+plot.MCA(res.MCA, choix='var',title="Graphe des variables")
+plot.MCA(res.MCA,invisible= c('var','quali.sup'),select= 'contrib 491',habillage=51,title="Graphe de l'ACM",cex=0.85,cex.main=0.85,cex.axis=0.85,label ="none")
+```
+
+
+```{r}
+
+res.MCA<-MCA(spamq,quali.sup=c(12,24,51),graph=FALSE)
+plot.MCA(res.MCA, choix='var',title="Graphe des variables",col.quali.sup='#006400')
+plot.MCA(res.MCA,invisible= 'ind',select= 'contrib 443',selectMod= 'contrib  34 ',col.quali.sup='#006400',title="Graphe de l'ACM",cex=0.75,cex.main=0.75,cex.axis=0.75,label =c('var','quali.sup'))
+```
+
+
+
+
+## Q2 : 
+
+L'algorithme choisit est le spherical kmeans, car on s'interesse plus à regrouper les données selon leur direction et non pas leur distance au sens euclidien (plutot la cosine similarité qui représente l'angle entre les vecteurs)
+
+```{r}
+## transformation en numeric
+spamq2=data.frame(matrix(as.numeric(as.matrix(spamq[,1:51]>0)),ncol=51))
+names(spamq2) <- colnames
+```
+
+
+
+```{r}
+
+#spamq2 <- spamq2[rowSums(spamq2[,1:50]) != 0, ]
+zs.skmeans <- skmeans(as.matrix(spam[1:50]+0.001), 2)
+table(zs.skmeans$cluster,spam[,51])
+
+print(" ")
+print(" ")
+
+print(paste("Accuracy: ", comparing.Partitions(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+print(paste("NMI: ", NMI(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+print(paste("ARI: ", ARI(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+
+
+
+
+
+spamq$class <- as.factor(zs.skmeans$cluster)
+res.MCA<-MCA(spamq,quali.sup=c(12,24,51,52),graph=FALSE)
+
+plot.MCA(res.MCA,invisible= c('var','quali.sup'),select= 'contrib 491',habillage=52,title="Graphe de l'ACM",cex=0.85,cex.main=0.85,cex.axis=0.85,label =c('none'))
+
+```
+
+# Q3:
+On peut remarquer qu'on dispose de 3 cluster, un des cluster semble isolé suelement les 2 autres semble etre trop melangé, on remarque aussi une perte de performance sur l'accuracy, NMI et ARI.
+
+```{r}
+zs.skmeans <- skmeans(as.matrix(spam[1:50]+0.001), 3)
+table(zs.skmeans$cluster,spam[,51])
+
+print("")
+print("")
+
+print(paste("Accuracy: ", comparing.Partitions(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+print(paste("NMI: ", NMI(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+print(paste("ARI: ", ARI(zs.skmeans$cluster,as.vector(as.matrix(spam[,51])))))
+
+
+spamq$class <- as.factor(zs.skmeans$cluster)
+res.MCA<-MCA(spamq,quali.sup=c(12,24,51,52),graph=FALSE)
+
+plot.MCA(res.MCA,invisible= c('var','quali.sup'),select= 'contrib 491',habillage=52,title="Graphe de l'ACM",cex=0.85,cex.main=0.85,cex.axis=0.85,label =c('none'))
+
+```
+
+
+
+## Q7: 
+On peut remarquer qu'en appliquant l'algorithme von-Mises	Fischer, on obtient des resultat meilleurs au niveau de l'accuracy et L'ari.
+
+```{r}
+
+res.vmf <- movMF(as.matrix(spam[1:50]+0.001), 2, nruns = 50, maxiter=400)
+Fitted = predict(res.vmf)
+table(Fitted,spam[,51])
+
+print(comparing.Partitions(Fitted,as.vector(as.matrix(spam[,51]))))
+print(NMI(Fitted,as.vector(as.matrix(spam[,51]))))
+print(ARI(Fitted,as.vector(as.matrix(spam[,51]))))
+
+
+spamq$class <- as.factor(Fitted)
+res.MCA<-MCA(spamq,quali.sup=c(12,24,51,52),graph=FALSE)
+
+plot.MCA(res.MCA,invisible= c('var','quali.sup'),select= 'contrib 491',habillage=52,title="Graphe de l'ACM",cex=0.85,cex.main=0.85,cex.axis=0.85,label =c('ind'))
+```
+
+# Utilisation de 1000 features :
+Dans cette partie nous allons utilisé 1000 features au lieux de 50
+
+
+
+
+```{r}
+spam=read.csv("C:\\Users\\imadw\\Desktop\\textmining\\spam_cocurence_1000.csv")
+colnames <- names(spam)
+
+# extraite la table des co-occurences
+spamq=data.frame(matrix(as.factor(as.matrix(spam[,1:1001]>0)),ncol=1001))
+names(spamq) <- colnames
+
+```
+
+
+## Q1:
+En appliquant une afcm sur notre table de co-occurence et en gardant les individus qui cntribuent le plus, on peut remarquer 2 cluster plus au moin lineairement séparable. on a eu presque le meme résultat qu'avec 50 features.
+
+```{r}
+
+res.MCA<-MCA(spamq,quali.sup=c(143,265,399,577,666,808,954,996,1001),graph=FALSE)
+plot.MCA(res.MCA, choix='var',title="Graphe des variables")
+plot.MCA(res.MCA,invisible= c('var','quali.sup'),habillage=1001,title="Graphe de l'ACM",label ='none')
+
+```
+
+
+
+
+
+```{r}
+
+plot.MCA(res.MCA, choix='var',title="Graphe des variables")
+plot.MCA(res.MCA,invisible= c('ind','quali.sup'),selectMod= 'contrib  27 ',habillage=1001,title="Graphe de l'ACM",cex=0.7,cex.main=0.7,cex.axis=0.7,label =c('var'))
+```
+
+
+
+
+
+
+
+
+## Q2:
+
+On obtient des résultat equivalent a celle obtenue avec 50 features.
+
+```{r}
+
+
+zs.skmeans <- skmeans(as.matrix(spam[1:1000]+0.001), 2)
+table(zs.skmeans$cluster,spam[,1001])
+
+print(" ")
+print(" ")
+
+print(paste("Accuracy: ", comparing.Partitions(zs.skmeans$cluster,as.vector(as.matrix(spam[,1001])))))
+print(paste("NMI: ", NMI(zs.skmeans$cluster,as.vector(as.matrix(spam[,1001])))))
+print(paste("ARI: ", ARI(zs.skmeans$cluster,as.vector(as.matrix(spam[,1001])))))
+
+
+```
+
+
+
+## Q7:
+
+On obtient des résultats legerement superieurs qu'avec 50 features et encore meilleur que spherical kmeans.
+
+```{r}
+res.vmf <- movMF(as.matrix(spam[1:1000]+0.001), 2, nruns = 50, maxiter=400)
+Fitted = predict(res.vmf)
+table(Fitted,spam[,1001])
+
+print(comparing.Partitions(Fitted,as.vector(as.matrix(spam[,1001]))))
+print(NMI(Fitted,as.vector(as.matrix(spam[,1001]))))
+print(ARI(Fitted,as.vector(as.matrix(spam[,1001]))))
+
+```
+
+
+
+
+
